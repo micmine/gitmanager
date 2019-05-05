@@ -114,13 +114,13 @@ createRepo()
 
   echo "The url is $REP_DOMAIN/$1/$2.git"
   echo ">Creating repositroy $2.git .."
-  sudo su git -c "mkdir -p $FOLDER_PATH/$1/$2.git"
+  sudo su $REP_USER -c "mkdir -p $FOLDER_PATH/$1/$2.git"
 
   # init git repository
   echo -n ">"
-  sudo su git -c "cd $FOLDER_PATH/$1/$2.git && git init --bare --shared"
-  sudo su git -c "cd $FOLDER_PATH/$1/$2.git && git update-server-info"
-  sudo su git -c "cd $FOLDER_PATH/$1/$2.git && chmod 775 -R *"
+  sudo su $REP_USER -c "cd $FOLDER_PATH/$1/$2.git && git init --bare --shared"
+  sudo su $REP_USER -c "cd $FOLDER_PATH/$1/$2.git && git update-server-info"
+  sudo su $REP_USER -c "cd $FOLDER_PATH/$1/$2.git && chmod 775 -R *"
   reloadConfig
 }
 
@@ -142,9 +142,11 @@ askContinue()
 #####################################################################################
 NAME=""
 ADD_USER="false"
+setup_git=0
 while [ $# -gt 0 ]
 do
   case "$1" in
+    -s)	setup_git=1 ;;  
     -t)	FOLDER_PATH=/tmp/repo/www && CONF_PATH=/tmp/repo/apache2 ;;
     -u)	ADD_USER="true" ;;
     -h)	Usage; exit 1 ;;
@@ -157,6 +159,17 @@ done
 if ! [ -n "$NAME" ]; then
   echo "Invalid parameter, missing name!"
   exit 1
+fi
+
+if [ $setup_git -eq 1 ]; then
+  sudo su - -c "cat <<< \"LoadModule dav_module libexec/httpd/libdav.so
+AddModule mod_dav.c
+DAVLockDB \"/usr/local/apache2/temp/DAV.lock\"\" > /etc/apache2/httpd.conf"
+
+  sudo a2enmod dav_fs
+  sudo systemctl restart apache2
+  sudo useradd $REP_USER
+  sudo chown -R $REP_USER:$REP_GROUP $FOLDER_PATH
 fi
 
 createApacheAccess $NAME
